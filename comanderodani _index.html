@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Comandero V8.3 Pro - Sistema Hostelería</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { box-sizing: border-box; touch-action: manipulation; -webkit-user-select: none; border-color: #000; }
+        body { font-family: ui-sans-serif, system-ui; background: #fff; height: 100vh; display: flex; flex-direction: column; overflow: hidden; margin: 0; color: #000; }
+        .b-fino { border: 1px solid #000 !important; }
+        .b-b { border-bottom: 1px solid #000 !important; }
+        .v-view { position: absolute; inset: 0; background: #fff; display: flex; flex-direction: column; padding: 15px; overflow-y: auto; padding-bottom: 110px; z-index: 10; }
+        .hidden { display: none !important; }
+        header { background: #0f172a; color: white; padding: 12px 16px; border-bottom: 1px solid #000; height: 65px; display: flex; justify-content: space-between; align-items: center; z-index: 100; }
+        .grid-mesas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+        .mesa-btn { height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-weight: 800; border: 1px solid #000; border-radius: 4px; position: relative; transition: transform 0.1s; }
+        .mesa-btn:active { transform: scale(0.95); }
+        .m-libre { background: #fff; }
+        .m-ocupada { background: #fee2e2; color: #dc2626; border-color: #dc2626 !important; }
+        .m-espera { background: #fef08a; color: #a16207; border-color: #a16207 !important; }
+        .btn-v81 { padding: 12px; font-weight: 700; border: 1px solid #000; border-radius: 4px; text-transform: uppercase; font-size: 11px; background: #fff; text-align: center; }
+        .footer-v81 { position: fixed; bottom: 0; left: 0; right: 0; height: 80px; background: #fff; border-top: 1px solid #000; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 10px; z-index: 1000; }
+        .input-v81 { border: 1px solid #000; padding: 12px; border-radius: 4px; width: 100%; font-weight: 700; background: #fff; color: #000; }
+        .calc-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .calc-b { border: 1px solid #000; background: #fff; height: 60px; font-size: 1.4rem; font-weight: 900; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+        .ticket-wa { font-family: 'Courier New', Courier, monospace; background: #fdfdfd; border: 1px dashed #000; padding: 15px; font-size: 12px; }
+        .wa-teclado { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .wa-key { border: 1px solid #000; background: #fff; height: 68px; font-size: 1.6rem; font-weight: 900; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+        .wa-key:active { background: #f1f5f9; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div>
+        <div id="cur-m-name" class="text-[9px] uppercase font-bold opacity-50">Seleccionar</div>
+        <div id="cur-total" class="text-xl font-black text-yellow-400">0.00 €</div>
+    </div>
+    <div class="flex gap-2">
+        <button onclick="app.addMesa()" class="w-10 h-10 bg-green-500 b-fino text-white font-black rounded">+</button>
+        <button onclick="app.verCaja()" class="px-3 bg-yellow-500 b-fino text-black font-black text-[10px] rounded">CAJA</button>
+        <button onclick="router.go('conf')" class="px-3 bg-slate-300 b-fino text-black font-black text-[10px] rounded">CARTA</button>
+    </div>
+</header>
+
+<main class="relative flex-1 overflow-hidden">
+    <div id="v-mesas" class="v-view grid-mesas"></div>
+    <div id="v-cats" class="v-view hidden">
+        <div id="list-cats" class="grid grid-cols-2 gap-2 mb-4"></div>
+        <div class="text-[10px] font-bold mb-2 uppercase opacity-40">Resumen Comanda:</div>
+        <div id="resumen-mesa" class="flex-grow b-fino p-3 overflow-y-auto text-[11px] font-bold uppercase bg-slate-50 italic"></div>
+    </div>
+    <div id="v-fams" class="v-view hidden">
+        <button onclick="router.go('cats')" class="btn-v81 mb-3 bg-slate-100 w-full">← VOLVER A CATEGORÍAS</button>
+        <div id="list-fams" class="grid grid-cols-2 gap-2"></div>
+    </div>
+    <div id="v-prods" class="v-view hidden">
+        <button onclick="router.go('fams')" class="btn-v81 mb-3 bg-slate-100 w-full">← VOLVER A FAMILIAS</button>
+        <input type="text" id="busc-p" class="input-v81 mb-3 uppercase" placeholder="🔍 BUSCAR PRODUCTO..." oninput="app.renderProds()">
+        <div id="list-prods" class="flex flex-col gap-2"></div>
+    </div>
+    <div id="v-calc" class="v-view hidden">
+        <div class="b-fino p-4 bg-white mb-4 rounded shadow-sm">
+            <div class="flex justify-between text-[10px] font-bold opacity-40 uppercase"><span>Total a Pagar</span><span id="c-tot">0.00€</span></div>
+            <div class="flex justify-between text-2xl font-black py-1"><span>Entrega</span><span id="c-pag" class="text-blue-600">0</span></div>
+            <div class="flex justify-between text-lg font-black text-green-600 border-t border-black pt-1"><span>Cambio</span><span id="c-cam">0.00€</span></div>
+        </div>
+        <div class="calc-pad mb-4" id="calc-grid"></div>
+        <div class="grid grid-cols-2 gap-3">
+            <button onclick="app.finalizar('EFECTIVO')" class="btn-v81 bg-green-600 text-white py-4 text-sm">💵 EFECTIVO</button>
+            <button onclick="app.finalizar('TARJETA')" class="btn-v81 bg-blue-600 text-white py-4 text-sm">💳 TARJETA</button>
+        </div>
+    </div>
+    <div id="v-conf" class="v-view hidden pb-32">
+        <button onclick="router.go('mesas')" class="btn-v81 mb-4 bg-black text-white">← CERRAR PANEL</button>
+        <div class="b-fino p-3 bg-purple-50 rounded mb-4">
+            <h3 class="font-black text-xs mb-2 uppercase">1. Gestionar Categorías</h3>
+            <div class="flex gap-2 mb-2">
+                <input id="new-cat-n" type="text" placeholder="NUEVA CATEGORÍA" class="input-v81 uppercase">
+                <button onclick="app.crearCategoria()" class="btn-v81 bg-purple-600 text-white px-4">ADD</button>
+            </div>
+            <input type="text" id="busc-edit-cat" class="input-v81 mb-2 text-[10px]" placeholder="🔍 FILTRAR CATEGORÍAS..." oninput="app.renderEditorCats()">
+            <div id="list-edit-cats" class="space-y-1 max-h-32 overflow-y-auto"></div>
+        </div>
+        <div class="b-fino p-3 bg-blue-50 rounded mb-4">
+            <h3 class="font-black text-xs mb-2 uppercase">2. Gestionar Familias</h3>
+            <select id="f-c-select" class="input-v81 mb-2"></select>
+            <div class="flex gap-2 mb-2">
+                <input id="new-fam-n" type="text" placeholder="NUEVA FAMILIA" class="input-v81 uppercase">
+                <button onclick="app.crearFamilia()" class="btn-v81 bg-blue-600 text-white px-4">ADD</button>
+            </div>
+            <input type="text" id="busc-edit-fam" class="input-v81 mb-2 text-[10px]" placeholder="🔍 FILTRAR FAMILIAS..." oninput="app.renderEditorFams()">
+            <div id="list-edit-fams" class="space-y-1 max-h-32 overflow-y-auto"></div>
+        </div>
+        <div class="b-fino p-3 bg-slate-50 rounded mb-4">
+            <h3 class="font-black text-xs mb-2 uppercase">3. Nuevo Producto</h3>
+            <input id="f-n" type="text" placeholder="NOMBRE PRODUCTO" class="input-v81 mb-2 uppercase">
+            <input id="f-p" type="number" step="0.01" placeholder="PRECIO 0.00" class="input-v81 mb-2">
+            <select id="f-f-select" class="input-v81 mb-4"></select>
+            <button onclick="app.crearProd()" class="btn-v81 bg-green-600 text-white w-full">GUARDAR EN CARTA</button>
+        </div>
+        <div class="b-fino p-3">
+            <h3 class="font-black text-xs mb-2 text-red-600 uppercase">4. Lista de Productos</h3>
+            <input type="text" id="busc-edit" class="input-v81 mb-3 uppercase" placeholder="🔍 FILTRAR PRODUCTOS..." oninput="app.renderEditorProds()">
+            <div id="list-edit" class="space-y-2"></div>
+        </div>
+    </div>
+    <div id="v-ticket" class="v-view hidden bg-black/80 z-[500] items-center justify-center p-4">
+        <div class="bg-white b-fino w-full max-w-xs p-5 rounded-lg">
+            <h2 class="text-center font-black mb-4 uppercase">Ticket de Venta</h2>
+            <div id="t-cont" class="ticket-wa mb-4 overflow-y-auto max-h-60 whitespace-pre-wrap"></div>
+            <input type="tel" id="wa-num" value="34" class="input-v81 mb-3 text-center text-lg" placeholder="TELÉFONO">
+            <button onclick="app.enviarWaTicket()" class="btn-v81 bg-green-600 text-white w-full mb-2">ENVIAR WHATSAPP</button>
+            <button onclick="app.cerrarMesaFinal()" class="btn-v81 bg-slate-200 w-full font-bold">SOLO CERRAR MESA</button>
+        </div>
+    </div>
+    <div id="v-cocina" class="v-view hidden bg-black/80 z-[500] items-center justify-center p-4">
+        <div class="bg-white b-fino w-full max-w-xs p-5 rounded-lg text-center">
+            <h2 class="font-black mb-4 uppercase text-sm">¿Enviar a Cocina?</h2>
+            <button onclick="app.mandarWaCocina('34674200028')" class="btn-v81 bg-orange-600 text-white w-full mb-3">👨‍🍳 COCINA 1</button>
+            <button onclick="app.mandarWaCocina('34700000000')" class="btn-v81 bg-blue-600 text-white w-full mb-4">👨‍🍳 COCINA 2</button>
+            <button onclick="document.getElementById('v-cocina').classList.add('hidden')" class="btn-v81 bg-slate-200 w-full text-xs">CANCELAR</button>
+        </div>
+    </div>
+    <div id="v-caja" class="v-view hidden">
+        <button onclick="router.go('mesas')" class="btn-v81 mb-4">← VOLVER</button>
+        <div id="res-caja" class="grid grid-cols-3 gap-2 mb-4 text-center"></div>
+        <button onclick="app.cierreDia()" class="btn-v81 bg-red-700 text-white w-full mb-3 text-xs">🔒 CIERRE DEL DÍA</button>
+        <div class="b-fino p-2 mb-2 bg-slate-100 rounded">
+            <input type="text" id="busc-caja" class="input-v81 uppercase" placeholder="🔍 BUSCAR POR MESA..." oninput="app.renderCaja()">
+        </div>
+        <div id="list-ventas" class="flex flex-col gap-2 pb-20"></div>
+    </div>
+    <div id="v-wa-caja" class="v-view hidden bg-black/80 z-[600] items-center justify-center p-4">
+        <div class="bg-white b-fino w-full max-w-xs p-5 rounded-lg">
+            <h2 class="text-center font-black mb-1 uppercase text-sm">📱 Enviar Ticket WA</h2>
+            <p id="wa-caja-info" class="text-center text-[10px] mb-3 opacity-50 uppercase"></p>
+            <div id="wa-caja-display" class="text-center text-3xl font-black b-fino p-3 mb-4 bg-slate-50 rounded tracking-widest">34</div>
+            <div class="wa-teclado mb-4">
+                <button class="wa-key" onclick="waCaja.add('1')">1</button>
+                <button class="wa-key" onclick="waCaja.add('2')">2</button>
+                <button class="wa-key" onclick="waCaja.add('3')">3</button>
+                <button class="wa-key" onclick="waCaja.add('4')">4</button>
+                <button class="wa-key" onclick="waCaja.add('5')">5</button>
+                <button class="wa-key" onclick="waCaja.add('6')">6</button>
+                <button class="wa-key" onclick="waCaja.add('7')">7</button>
+                <button class="wa-key" onclick="waCaja.add('8')">8</button>
+                <button class="wa-key" onclick="waCaja.add('9')">9</button>
+                <button class="wa-key" onclick="waCaja.add('⌫')">⌫</button>
+                <button class="wa-key" onclick="waCaja.add('0')">0</button>
+                <button class="wa-key bg-green-100" onclick="waCaja.enviar()">✔</button>
+            </div>
+            <button onclick="waCaja.cerrar()" class="btn-v81 bg-slate-200 w-full text-xs">CANCELAR</button>
+        </div>
+    </div>
+    <div id="v-cierre" class="v-view hidden bg-black/80 z-[600] items-center justify-center p-4">
+        <div class="bg-white b-fino w-full max-w-xs p-5 rounded-lg">
+            <h2 class="text-center font-black mb-4 uppercase text-sm">🔒 Cierre del Día</h2>
+            <div id="cierre-resumen" class="ticket-wa mb-4 whitespace-pre-wrap text-[11px]"></div>
+            <button onclick="app.confirmarCierre()" class="btn-v81 bg-red-700 text-white w-full mb-2">CONFIRMAR CIERRE Y BORRAR</button>
+            <button onclick="document.getElementById('v-cierre').classList.add('hidden')" class="btn-v81 bg-slate-200 w-full text-xs">CANCELAR</button>
+        </div>
+    </div>
+</main>
+
+<nav id="footer" class="footer-v81 hidden">
+    <button onclick="router.go('mesas')" class="btn-v81">MESAS</button>
+    <button onclick="app.enviarCocina()" class="btn-v81 bg-orange-600 text-white">COCINA</button>
+    <button onclick="app.pedirCuenta()" class="btn-v81 bg-yellow-400">CUENTA</button>
+    <button onclick="app.abrirCobro()" class="btn-v81 bg-blue-700 text-white">COBRAR</button>
+</nav>
+<script>
+const app = {
+    mId: null, catAct: null, famAct: null, longPressTimer: null, msgCocinaTemp: "",
+    cats: JSON.parse(localStorage.getItem('v82_cats')) || ["BEBIDAS", "COMIDA", "POSTRES"],
+    db: JSON.parse(localStorage.getItem('v82_db')) || [],
+    mesas: JSON.parse(localStorage.getItem('v82_mesas')) || Array.from({length: 12}, (_, i) => ({id: i+1, n: (i+1).toString(), est: 'libre'})),
+    comandas: JSON.parse(localStorage.getItem('v82_comandas')) || {},
+    fams: JSON.parse(localStorage.getItem('v82_fams')) || [],
+    ventas: JSON.parse(localStorage.getItem('v82_ventas')) || [],
+    excluirCocina: ["BEBIDAS", "VINOS", "CAFES", "COPAS", "CERVEZAS", "REFRESCOS"],
+    init() { this.renderMesas(); this.fillSelectors(); this.buildCalc(); router.go('mesas'); },
+    save(k) { localStorage.setItem('v82_'+k, JSON.stringify(this[k])); },
+    renderMesas() {
+        const c = document.getElementById('v-mesas'); c.innerHTML = '';
+        this.mesas.forEach(m => {
+            const items = this.comandas[m.id] || [];
+            let clase = 'm-libre';
+            if(items.length > 0) clase = (m.est === 'espera') ? 'm-espera' : 'm-ocupada';
+            const d = document.createElement('div');
+            d.className = 'mesa-btn ' + clase;
+            d.innerHTML = '<span class="text-[7px] opacity-40 uppercase">Mesa</span><span>' + m.n + '</span>';
+            d.onmousedown = d.ontouchstart = () => this.startLongPress(m);
+            d.onmouseup = d.onmouseleave = d.ontouchend = () => this.endLongPress();
+            d.onclick = () => this.abrirMesa(m);
+            c.appendChild(d);
+        });
+    },
+    startLongPress(m) {
+        this.longPressTimer = setTimeout(() => {
+            const op = prompt('Mesa ' + m.n + ':\n1. Renombrar\n2. Borrar\n(Escribe 1 o 2)', "1");
+            if(op === "1") { const nn = prompt("Nuevo nombre:", m.n); if(nn) { m.n = nn.toUpperCase(); this.save('mesas'); this.renderMesas(); } }
+            else if(op === "2") { if(confirm("¿Borrar mesa?")) { this.mesas = this.mesas.filter(x => x.id !== m.id); this.save('mesas'); this.renderMesas(); } }
+        }, 2000);
+    },
+    endLongPress() { clearTimeout(this.longPressTimer); },
+    abrirMesa(m) {
+        this.mId = m.id;
+        document.getElementById('cur-m-name').innerText = "Mesa " + m.n;
+        if(!this.comandas[this.mId]) this.comandas[this.mId] = [];
+        this.upResumen(); this.renderCats(); router.go('cats');
+        document.getElementById('footer').classList.remove('hidden');
+    },
+    renderCats() {
+        document.getElementById('list-cats').innerHTML = this.cats.map(c =>
+            '<button onclick="app.verFams(\'' + c + '\')" class="btn-v81 bg-slate-50">' + c + '</button>'
+        ).join('');
+    },
+    verFams(c) {
+        this.catAct = c;
+        const filtradas = this.fams.filter(f => f.cat === c);
+        document.getElementById('list-fams').innerHTML = filtradas.map(f =>
+            '<button onclick="app.verProds(\'' + f.id + '\')" class="btn-v81 bg-blue-50">' + f.n + '</button>'
+        ).join('') || '<div class="col-span-2 text-center py-10 opacity-30">SIN FAMILIAS</div>';
+        router.go('fams');
+    },
+    verProds(fId) { this.famAct = fId; document.getElementById('busc-p').value = ""; this.renderProds(); router.go('prods'); },
+    renderProds() {
+        const busc = document.getElementById('busc-p').value.toUpperCase();
+        const items = this.db.filter(p => (p.famId === this.famAct || busc.length > 0) && p.n.includes(busc));
+        document.getElementById('list-prods').innerHTML = items.map(p => {
+            const pEnM = this.comandas[this.mId].find(x => x.id === p.id);
+            const cant = pEnM ? pEnM.cant : 0;
+            return '<div class="flex justify-between items-center p-3 b-fino bg-white rounded shadow-sm"><div class="flex-1"><div class="font-bold text-sm">' + p.n + '</div><div class="text-[10px] opacity-50">' + p.p.toFixed(2) + '€</div></div><div class="flex items-center gap-4"><button onclick="app.qty(\'' + p.id + '\',-1)" class="w-10 h-10 b-fino rounded bg-red-50 font-bold">-</button><span class="font-black text-lg ' + (cant > 0 ? 'text-blue-600' : 'opacity-20') + '">' + cant + '</span><button onclick="app.qty(\'' + p.id + '\',1)" class="w-10 h-10 b-fino rounded bg-green-50 font-bold">+</button></div></div>';
+        }).join('');
+    },
+    qty(id, delta) {
+        const mesa = this.comandas[this.mId];
+        const idx = mesa.findIndex(x => x.id === id);
+        if (idx > -1) { mesa[idx].cant += delta; if (mesa[idx].cant <= 0) mesa.splice(idx, 1); }
+        else if (delta > 0) { const p = this.db.find(x => x.id === id); mesa.push({ ...p, cant: 1, env: false }); }
+        const mObj = this.mesas.find(x => x.id === this.mId);
+        if(mObj.est === 'espera') mObj.est = 'ocupada';
+        this.save('comandas'); this.save('mesas'); this.upResumen(); this.renderProds();
+    },
+    upResumen() {
+        const items = this.comandas[this.mId] || [];
+        const tot = items.reduce((s, i) => s + (i.p * i.cant), 0);
+        document.getElementById('cur-total').innerText = tot.toFixed(2) + " €";
+        document.getElementById('resumen-mesa').innerHTML = items.map(i =>
+            '<div class="flex justify-between b-b py-1"><span>' + i.n + ' <span class="text-blue-600">x' + i.cant + '</span></span><span>' + (i.p * i.cant).toFixed(2) + '€</span></div>'
+        ).join('');
+    },
+    enviarCocina() {
+        const mesa = this.mesas.find(x => x.id === this.mId);
+        const items = this.comandas[this.mId].filter(i => !this.excluirCocina.includes(i.c) && !i.env);
+        if(items.length === 0) return alert("NADA NUEVO");
+        let msg = '🔴 *MESA ' + mesa.n + '*\n---------------------------\n';
+        items.forEach(i => { msg += i.cant + 'x *' + i.n + '*\n'; i.env = true; });
+        msg += '---------------------------';
+        this.msgCocinaTemp = msg; this.save('comandas');
+        document.getElementById('v-cocina').classList.remove('hidden');
+    },
+    mandarWaCocina(tel) {
+        window.open('https://wa.me/' + tel + '?text=' + encodeURIComponent(this.msgCocinaTemp));
+        document.getElementById('v-cocina').classList.add('hidden');
+    },
+    pedirCuenta() { this.mesas.find(x => x.id === this.mId).est = 'espera'; this.save('mesas'); router.go('mesas'); },
+    buildCalc() {
+        const g = document.getElementById('calc-grid'); g.innerHTML = '';
+        ['7','8','9','4','5','6','1','2','3','⌫','0','.'].forEach(t => {
+            const b = document.createElement('button');
+            b.className = "calc-b"; b.innerText = t; b.onclick = () => calc.add(t);
+            g.appendChild(b);
+        });
+    },
+    abrirCobro() { calc.open(); },
+    finalizar(metodo) {
+        const items = [...this.comandas[this.mId]];
+        const tot = items.reduce((s, i) => s + (i.p * i.cant), 0);
+        const mN = this.mesas.find(x => x.id === this.mId).n;
+        this.ventas.push({ id: Date.now(), mN, total: tot, metodo, items, fecha: new Date().toLocaleTimeString() });
+        this.save('ventas');
+        let t = '*TICKET MESA ' + mN + '*\n';
+        items.forEach(i => t += i.cant + 'x ' + i.n + ' - ' + (i.p*i.cant).toFixed(2) + '€\n');
+        t += '\n*TOTAL: ' + tot.toFixed(2) + '€*\n*PAGO: ' + metodo + '*';
+        document.getElementById('t-cont').innerText = t;
+        router.go('ticket');
+    },
+    enviarWaTicket() {
+        const num = document.getElementById('wa-num').value;
+        const txt = document.getElementById('t-cont').innerText;
+        window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(txt));
+    },
+    cerrarMesaFinal() {
+        this.comandas[this.mId] = [];
+        this.mesas.find(x => x.id === this.mId).est = 'libre';
+        this.save('comandas'); this.save('mesas'); router.go('mesas');
+    },
+    verCaja() { this.renderCaja(); router.go('caja'); },
+    renderCaja() {
+        const busc = document.getElementById('busc-caja').value.toUpperCase();
+        const filtradas = this.ventas.filter(v => v.mN.toUpperCase().includes(busc));
+        const ef = filtradas.filter(v => v.metodo === 'EFECTIVO').reduce((s,v) => s + v.total, 0);
+        const tr = filtradas.filter(v => v.metodo === 'TARJETA').reduce((s,v) => s + v.total, 0);
+        document.getElementById('res-caja').innerHTML =
+            '<div class="b-fino p-2 bg-green-50">💵<br><b>' + ef.toFixed(2) + '€</b></div>' +
+            '<div class="b-fino p-2 bg-blue-50">💳<br><b>' + tr.toFixed(2) + '€</b></div>' +
+            '<div class="b-fino p-2 bg-yellow-50">💰<br><b>' + (ef+tr).toFixed(2) + '€</b></div>';
+        document.getElementById('list-ventas').innerHTML = filtradas.slice().reverse().map(v =>
+            '<div class="flex justify-between items-center p-3 b-fino bg-white text-[10px] gap-2"><div class="flex-1"><div>MESA ' + v.mN + ' - ' + v.fecha + '</div><div class="font-bold">' + v.total.toFixed(2) + '€ (' + v.metodo + ')</div></div><button onclick="app.abrirWaCaja(' + v.id + ')" class="btn-v81 bg-green-500 text-white p-2">📱 WA</button></div>'
+        ).join('');
+    },
+    abrirWaCaja(id) {
+        waCaja.ventaId = id;
+        const v = this.ventas.find(x => x.id === id);
+        document.getElementById('wa-caja-info').innerText = 'Mesa ' + v.mN + ' - ' + v.total.toFixed(2) + '€';
+        waCaja.num = "34";
+        document.getElementById('wa-caja-display').innerText = "34";
+        document.getElementById('v-wa-caja').classList.remove('hidden');
+    },
+    enviarCajaWa(id, num) {
+        const v = this.ventas.find(x => x.id === id);
+        let t = '*TICKET MESA ' + v.mN + '*\n*FECHA:* ' + v.fecha + '\n\n';
+        v.items.forEach(i => t += i.cant + 'x ' + i.n + ' - ' + (i.p*i.cant).toFixed(2) + '€\n');
+        t += '\n*TOTAL: ' + v.total.toFixed(2) + '€*\n*PAGO: ' + v.metodo + '*';
+        window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(t));
+    },
+    cierreDia() {
+        const ef = this.ventas.filter(v => v.metodo === 'EFECTIVO').reduce((s,v) => s + v.total, 0);
+        const tr = this.ventas.filter(v => v.metodo === 'TARJETA').reduce((s,v) => s + v.total, 0);
+        const fecha = new Date().toLocaleDateString('es-ES');
+        const hora = new Date().toLocaleTimeString('es-ES');
+        let resumen = 'CIERRE DEL DÍA\nFecha: ' + fecha + ' ' + hora + '\n--------------------------------\n';
+        resumen += '💵 EFECTIVO:  ' + ef.toFixed(2) + '€\n';
+        resumen += '💳 TARJETA:   ' + tr.toFixed(2) + '€\n';
+        resumen += '--------------------------------\n';
+        resumen += '💰 TOTAL:     ' + (ef+tr).toFixed(2) + '€\n';
+        resumen += '--------------------------------\nNº Tickets:   ' + this.ventas.length;
+        document.getElementById('cierre-resumen').innerText = resumen;
+        document.getElementById('v-cierre').classList.remove('hidden');
+    },
+    confirmarCierre() {
+        this.ventas = []; this.save('ventas');
+        document.getElementById('v-cierre').classList.add('hidden');
+        this.renderCaja();
+        alert("✅ CIERRE REALIZADO. CAJA VACIADA.");
+    },
+    fillSelectors() {
+        document.getElementById('f-c-select').innerHTML = this.cats.map(c => '<option value="' + c + '">' + c + '</option>').join('');
+        this.updateFamSelector();
+    },
+    updateFamSelector() {
+        const c = document.getElementById('f-c-select').value;
+        document.getElementById('f-f-select').innerHTML = this.fams.filter(f => f.cat === c).map(f => '<option value="' + f.id + '">' + f.n + '</option>').join('');
+    },
+    crearCategoria() {
+        const n = document.getElementById('new-cat-n').value.toUpperCase();
+        if(!n) return; this.cats.push(n); this.save('cats');
+        document.getElementById('new-cat-n').value = ""; this.fillSelectors(); this.renderEditorCats();
+    },
+    renderEditorCats() {
+        const busc = document.getElementById('busc-edit-cat').value.toUpperCase();
+        document.getElementById('list-edit-cats').innerHTML = this.cats.filter(c => c.includes(busc)).map(c =>
+            '<div class="flex justify-between items-center bg-white p-1 border border-black/10 rounded"><span class="text-[9px] font-bold">' + c + '</span><div class="flex gap-1"><button onclick="app.editCat(\'' + c + '\')" class="p-1 bg-yellow-400 b-fino text-[8px]">✏️</button><button onclick="app.delCat(\'' + c + '\')" class="p-1 bg-red-600 text-white b-fino text-[8px]">🗑️</button></div></div>'
+        ).join('');
+    },
+    editCat(old) {
+        const nn = prompt("Nuevo nombre Categoría:", old);
+        if(nn) {
+            const up = nn.toUpperCase();
+            this.cats = this.cats.map(c => c === old ? up : c);
+            this.fams = this.fams.map(f => f.cat === old ? {...f, cat: up} : f);
+            this.db = this.db.map(p => p.c === old ? {...p, c: up} : p);
+            this.save('cats'); this.save('fams'); this.save('db');
+            this.renderEditorCats(); this.fillSelectors();
+        }
+    },
+    delCat(c) {
+        if(confirm('¿Borrar ' + c + '?')) { this.cats = this.cats.filter(x => x !== c); this.save('cats'); this.renderEditorCats(); this.fillSelectors(); }
+    },
+    crearFamilia() {
+        const n = document.getElementById('new-fam-n').value.toUpperCase();
+        const c = document.getElementById('f-c-select').value;
+        if(!n) return;
+        this.fams.push({id: 'f-'+Date.now(), n, cat: c});
+        this.save('fams'); document.getElementById('new-fam-n').value = "";
+        this.updateFamSelector(); this.renderEditorFams();
+    },
+    renderEditorFams() {
+        const busc = document.getElementById('busc-edit-fam').value.toUpperCase();
+        document.getElementById('list-edit-fams').innerHTML = this.fams.filter(f => f.n.includes(busc)).map(f =>
+            '<div class="flex justify-between items-center bg-white p-1 border border-black/10 rounded"><span class="text-[9px] font-bold">' + f.n + ' (' + f.cat + ')</span><div class="flex gap-1"><button onclick="app.editFam(\'' + f.id + '\')" class="p-1 bg-yellow-400 b-fino text-[8px]">✏️</button><button onclick="app.delFam(\'' + f.id + '\')" class="p-1 bg-red-600 text-white b-fino text-[8px]">🗑️</button></div></div>'
+        ).join('');
+    },
+    editFam(id) {
+        const f = this.fams.find(x => x.id === id);
+        const nn = prompt("Nuevo nombre Familia:", f.n);
+        if(nn) { f.n = nn.toUpperCase(); this.save('fams'); this.renderEditorFams(); this.updateFamSelector(); }
+    },
+    delFam(id) {
+        if(confirm("¿Borrar Familia?")) { this.fams = this.fams.filter(x => x.id !== id); this.save('fams'); this.renderEditorFams(); this.updateFamSelector(); }
+    },
+    crearProd() {
+        const n = document.getElementById('f-n').value.toUpperCase();
+        const p = parseFloat(document.getElementById('f-p').value);
+        const fId = document.getElementById('f-f-select').value;
+        const c = document.getElementById('f-c-select').value;
+        if(n && p && fId) {
+            this.db.push({id: 'p-'+Date.now(), n, p, famId: fId, c: c});
+            this.save('db'); document.getElementById('f-n').value = ""; document.getElementById('f-p').value = "";
+            this.renderEditorProds(); alert("LISTO");
+        }
+    },
+    renderEditorProds() {
+        const busc = document.getElementById('busc-edit').value.toUpperCase();
+        document.getElementById('list-edit').innerHTML = this.db.filter(p => p.n.includes(busc)).map(p =>
+            '<div class="flex justify-between items-center p-1 b-fino bg-white"><span class="text-[10px] font-bold">' + p.n + ' (' + p.p.toFixed(2) + '€)</span><div class="flex gap-2"><button onclick="app.editP(\'' + p.id + '\')" class="p-1 bg-yellow-400 rounded">✏️</button><button onclick="app.delP(\'' + p.id + '\')" class="p-2 bg-red-600 text-white rounded">🗑️</button></div></div>'
+        ).join('');
+    },
+    editP(id) {
+        const p = this.db.find(x => x.id === id);
+        const nN = prompt("NOMBRE:", p.n); const nP = prompt("PRECIO:", p.p);
+        if(nN && nP) { p.n = nN.toUpperCase(); p.p = parseFloat(nP); this.save('db'); this.renderEditorProds(); }
+    },
+    delP(id) {
+        if(confirm("¿BORRAR?")) { this.db = this.db.filter(x => x.id !== id); this.save('db'); this.renderEditorProds(); }
+    },
+    addMesa() {
+        const n = prompt("NÚMERO DE MESA:");
+        if(n) { this.mesas.push({id: Date.now(), n: n.toUpperCase(), est: 'libre'}); this.save('mesas'); this.renderMesas(); }
+    }
+};
+
+const waCaja = {
+    ventaId: null, num: "34",
+    add(t) { if(t === '⌫') { this.num = this.num.slice(0, -1) || ""; } else { this.num += t; } document.getElementById('wa-caja-display').innerText = this.num || "_"; },
+    enviar() { if(!this.num) return alert("INTRODUCE UN NÚMERO"); app.enviarCajaWa(this.ventaId, this.num); this.cerrar(); },
+    cerrar() { document.getElementById('v-wa-caja').classList.add('hidden'); }
+};
+
+const calc = {
+    v: "", open() { this.v = ""; this.up(); router.go('calc'); },
+    add(t) { if(t==='⌫') this.v = this.v.slice(0,-1); else if(t==='.') { if(!this.v.includes('.')) this.v += this.v === "" ? "0." : "."; } else this.v += t; this.up(); },
+    up() {
+        const tot = app.comandas[app.mId]?.reduce((s,i)=>s+(i.p*i.cant),0) || 0;
+        const pag = parseFloat(this.v) || 0;
+        document.getElementById('c-tot').innerText = tot.toFixed(2) + "€";
+        document.getElementById('c-pag').innerText = this.v || "0";
+        document.getElementById('c-cam').innerText = (pag > tot ? pag - tot : 0).toFixed(2) + "€";
+    }
+};
+
+const router = {
+    go(id) {
+        document.querySelectorAll('.v-view').forEach(v => v.classList.add('hidden'));
+        document.getElementById('v-' + id).classList.remove('hidden');
+        if(id === 'mesas') app.renderMesas();
+        if(id === 'conf') { app.fillSelectors(); app.renderEditorCats(); app.renderEditorFams(); app.renderEditorProds(); }
+    }
+};
+
+document.getElementById('f-c-select')?.addEventListener('change', () => app.updateFamSelector());
+window.onload = () => app.init();
+</script>
+</body>
+</html>
